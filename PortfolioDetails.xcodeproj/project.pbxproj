@@ -306,6 +306,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Portfolio Details";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Import Chase CSV files that contain your portfolio holdings.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.1;
@@ -331,6 +332,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Portfolio Details";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Import Chase CSV files that contain your portfolio holdings.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.1;
@@ -369,4 +371,3 @@
 	};
 	rootObject = 7A1000802C00000100000001 /* Project object */;
 }
-
