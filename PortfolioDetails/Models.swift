@@ -95,6 +95,16 @@ struct FinnhubMetricResponse: Decodable {
     let metric: [String: Double]
 }
 
+struct SecurityLookupResult {
+    let symbol: String
+    let name: String?
+    let price: Decimal
+    let sector: String?
+    let industry: String?
+    let beta: Double?
+    let dividendYield: Decimal?
+}
+
 struct ImportPreviewRow: Identifiable, Hashable {
     enum Status: String {
         case ready = "Ready"
@@ -109,4 +119,3 @@ struct ImportPreviewRow: Identifiable, Hashable {
     var holding: Holding?
     var message: String
 }
-

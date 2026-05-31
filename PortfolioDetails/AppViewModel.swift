@@ -86,6 +86,37 @@ final class AppViewModel: ObservableObject {
         savePortfolio()
     }
 
+    func lookupSecurity(symbol rawSymbol: String) async throws -> SecurityLookupResult {
+        let symbol = rawSymbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !apiKeyInput.isEmpty else { throw FinnhubClient.FinnhubError.missingAPIKey }
+        guard !symbol.isEmpty else { throw FinnhubClient.FinnhubError.badResponse }
+
+        let client = FinnhubClient(apiKey: apiKeyInput)
+        async let quote = client.quote(for: symbol)
+        async let profile = client.profile(for: symbol)
+        let quoteResult = try await quote
+        let profileResult = try await profile
+
+        guard quoteResult.current > 0 || profileResult.ticker != nil || profileResult.name != nil else {
+            throw FinnhubClient.FinnhubError.badResponse
+        }
+
+        let metrics = try? await client.metrics(for: symbol)
+        return SecurityLookupResult(
+            symbol: profileResult.ticker ?? symbol,
+            name: profileResult.name,
+            price: Decimal(quoteResult.current),
+            sector: profileResult.finnhubIndustry,
+            industry: profileResult.finnhubIndustry,
+            beta: metrics?.metric["beta"],
+            dividendYield: decimalMetric(metrics, keys: [
+                "dividendYieldIndicatedAnnual",
+                "currentDividendYieldTTM",
+                "dividendYield5Y"
+            ])
+        )
+    }
+
     func refreshMarketData() async {
         guard !apiKeyInput.isEmpty else {
             alertMessage = "Add a Finnhub API key first."
@@ -128,6 +159,16 @@ final class AppViewModel: ObservableObject {
             .split(separator: "=", maxSplits: 1)
             .last
             .map(String.init) ?? ""
+    }
+
+    private func decimalMetric(_ metrics: FinnhubMetricResponse?, keys: [String]) -> Decimal? {
+        guard let metric = metrics?.metric else { return nil }
+        for key in keys {
+            if let value = metric[key], value > 0 {
+                return Decimal(value / 100)
+            }
+        }
+        return nil
     }
 
     private func loadPortfolio() {

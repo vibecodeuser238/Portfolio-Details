@@ -69,38 +69,20 @@ private struct ManualHoldingForm: View {
     @State private var quantity = ""
     @State private var price = ""
     @State private var costBasis = ""
+    @State private var sector = ""
+    @State private var industry = ""
+    @State private var dividendYield: Decimal?
+    @State private var beta: Double?
+    @State private var lookupStatus = "Enter a ticker, then validate it to fill market data."
+    @State private var isLookingUpTicker = false
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Account") {
-                    Picker("Account", selection: Binding(
-                        get: { accountID ?? viewModel.accounts.first?.id ?? UUID() },
-                        set: { accountID = $0 }
-                    )) {
-                        ForEach(viewModel.accounts) { account in
-                            Text(account.name).tag(account.id)
-                        }
-                    }
-                }
-
-                Section("Security") {
-                    Picker("Type", selection: $securityType) {
-                        ForEach(SecurityType.allCases) { type in
-                            Text(type.rawValue).tag(type)
-                        }
-                    }
-                    TextField("Symbol", text: $symbol)
-                    TextField("Description", text: $description)
-                    TextField("Asset Class", text: $assetClass)
-                    TextField("Strategy", text: $assetStrategy)
-                }
-
-                Section("Position") {
-                    TextField("Quantity", text: $quantity)
-                    TextField("Price", text: $price)
-                    TextField("Cost Basis", text: $costBasis)
-                }
+                accountSection
+                securitySection
+                marketDataSection
+                positionSection
             }
             .navigationTitle("Manual Holding")
             .toolbar {
@@ -117,11 +99,105 @@ private struct ManualHoldingForm: View {
             .onAppear {
                 accountID = accountID ?? viewModel.accounts.first(where: { $0.kind == .fourOhOneK })?.id ?? viewModel.accounts.first?.id
             }
+            .onChange(of: symbol) {
+                lookupStatus = "Ticker changed. Validate it to refresh market data."
+            }
+        }
+    }
+
+    private var accountSection: some View {
+        Section("Account") {
+            Picker("Account", selection: Binding(
+                get: { accountID ?? viewModel.accounts.first?.id ?? UUID() },
+                set: { accountID = $0 }
+            )) {
+                ForEach(viewModel.accounts) { account in
+                    Text(account.name).tag(account.id)
+                }
+            }
+        }
+    }
+
+    private var securitySection: some View {
+        Section("Security") {
+            Picker("Type", selection: $securityType) {
+                ForEach(SecurityType.allCases) { type in
+                    Text(type.rawValue).tag(type)
+                }
+            }
+            TextField("Symbol", text: $symbol)
+                .autocorrectionDisabled()
+            TextField("Description", text: $description)
+            TextField("Asset Class", text: $assetClass)
+            TextField("Strategy", text: $assetStrategy)
+        }
+    }
+
+    private var marketDataSection: some View {
+        Section("Market Data") {
+            Button {
+                Task { await validateTicker() }
+            } label: {
+                if isLookingUpTicker {
+                    ProgressView()
+                } else {
+                    Label("Validate Ticker", systemImage: "checkmark.circle")
+                }
+            }
+            .disabled(isLookingUpTicker || normalizedSymbol.isEmpty || securityType == .cash)
+
+            Text(lookupStatus)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            TextField("Sector", text: $sector)
+            TextField("Industry", text: $industry)
+        }
+    }
+
+    private var positionSection: some View {
+        Section("Position") {
+            TextField("Quantity", text: $quantity)
+            TextField("Price", text: $price)
+            TextField("Cost Basis", text: $costBasis)
         }
     }
 
     private var canSave: Bool {
         decimal(quantity) != nil && decimal(price) != nil && decimal(costBasis) != nil
+    }
+
+    private var normalizedSymbol: String {
+        symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+    }
+
+    private func validateTicker() async {
+        isLookingUpTicker = true
+        lookupStatus = "Validating ticker..."
+        defer { isLookingUpTicker = false }
+
+        do {
+            let result = try await viewModel.lookupSecurity(symbol: symbol)
+            symbol = result.symbol
+            if let name = result.name, !name.isEmpty {
+                description = name
+            } else if description.isEmpty {
+                description = result.symbol
+            }
+            price = result.price.plainString
+            if let sector = result.sector, !sector.isEmpty {
+                self.sector = sector
+            }
+            if let industry = result.industry, !industry.isEmpty {
+                self.industry = industry
+            }
+            beta = result.beta
+            dividendYield = result.dividendYield
+            lookupStatus = "Validated. Price and sector were filled from Finnhub."
+        } catch {
+            lookupStatus = "Could not validate this ticker."
+            viewModel.alertMessage = error.localizedDescription
+        }
     }
 
     private func save() {
@@ -143,7 +219,11 @@ private struct ManualHoldingForm: View {
             price: price,
             marketValue: marketValue,
             costBasis: costBasis,
-            unrealizedGainLoss: marketValue - costBasis
+            unrealizedGainLoss: marketValue - costBasis,
+            dividendYield: dividendYield,
+            beta: beta,
+            sector: sector.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+            industry: industry.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         )
         viewModel.addManualHolding(holding)
         dismiss()
@@ -151,5 +231,17 @@ private struct ManualHoldingForm: View {
 
     private func decimal(_ value: String) -> Decimal? {
         Decimal(string: value.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+}
+
+private extension Decimal {
+    var plainString: String {
+        NSDecimalNumber(decimal: self).stringValue
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }
