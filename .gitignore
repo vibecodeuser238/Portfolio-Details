@@ -1,0 +1,7 @@
+.env
+*.xcuserstate
+xcuserdata/
+DerivedData/
+DerivedData-iOS/
+DerivedData-*/
+.DS_Store
